@@ -67,4 +67,7 @@ uint8_t make_prediction(uint32_t pc);
 //
 void train_predictor(uint32_t pc, uint8_t outcome);
 
+#define max(a,b) (a>b?a:b)
+#define min(a,b) (a<b?a:b)
+
 #endif

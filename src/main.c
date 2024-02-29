@@ -66,9 +66,11 @@ handle_option(char *arg)
 int
 read_branch(uint32_t *pc, uint8_t *outcome)
 {
-  if (getline(&buf, &len, stream) == -1) {
+  int r=0;
+  if ((r=getline(&buf, &len, stream)) == -1) {
     return 0;
   }
+    // printf("%d\n",r);
 
   uint32_t tmp;
   sscanf(buf,"0x%x %d\n",pc,&tmp);
@@ -112,6 +114,7 @@ main(int argc, char *argv[])
 
   // Reach each branch from the trace
   while (read_branch(&pc, &outcome)) {
+    // printf("0x%x %d\n",pc,outcome);
     num_branches++;
 
     // Make a prediction and compare with actual outcome
