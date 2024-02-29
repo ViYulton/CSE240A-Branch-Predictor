@@ -29,6 +29,7 @@ int lhistoryBits; // Number of bits used for Local History
 int pcIndexBits;  // Number of bits used for PC index
 int bpType;       // Branch Prediction Type
 int verbose;
+int weightBits;
 
 //------------------------------------//
 //      Predictor Data Structures     //
@@ -46,6 +47,10 @@ int lhistoryMask;
 int pcMask;
 int ghistory;
 
+int **weight = NULL;
+int weight_max;
+int weight_min;
+int theta;
 //------------------------------------//
 //        Predictor Functions         //
 //------------------------------------//
@@ -76,6 +81,18 @@ void init_predictor()
     lhistoryMask = (1 << lhistoryBits) - 1;
     break;
   case CUSTOM:
+    ghistoryMask = (1 << ghistoryBits) - 1;
+    ghistory = 0;
+    pcMask = (1 << pcIndexBits) - 1;
+    weight = calloc(1 << pcIndexBits, sizeof(int *));
+    for (int i = 0; i <= pcMask; i++)
+    {
+      weight[i] = calloc(ghistoryBits + 1, sizeof(int));
+    }
+    weight_max = (1 << (weightBits - 1)) - 1;
+    weight_min = -weight_max - 1;
+    theta = 1.93 * ghistoryBits + 14;
+    break;
   default:
     break;
   }
@@ -142,6 +159,27 @@ make_prediction(uint32_t pc)
   }
   case CUSTOM:
   {
+    int index = pc & pcMask;
+    int y_out = weight[index][ghistoryBits];
+    for (int i = 0; i < ghistoryBits; i++)
+    {
+      if (ghistory & (1 << i))
+      {
+        y_out += weight[index][i];
+      }
+      else
+      {
+        y_out -= weight[index][i];
+      }
+    }
+    if (y_out >= 0)
+    {
+      return TAKEN;
+    }
+    else
+    {
+      return NOTTAKEN;
+    }
   }
   default:
     break;
@@ -218,6 +256,29 @@ void train_predictor(uint32_t pc, uint8_t outcome)
   }
   case CUSTOM:
   {
+    int index = pc & pcMask;
+    int y_out = weight[index][ghistoryBits];
+    for (int i = 0; i < ghistoryBits; i++)
+    {
+      if (ghistory & (1 << i))
+      {
+        y_out += weight[index][i];
+      }
+      else
+      {
+        y_out -= weight[index][i];
+      }
+    }
+    if ((y_out >= 0) != outcome || abs(y_out) <= theta)
+    {
+      weight[index][ghistoryBits] += outcome == TAKEN ? 1 : -1;
+      for (int i = 0; i < ghistoryBits; i++)
+      {
+        weight[index][i] += outcome == ((ghistory >> i) & 1) ? 1 : -1;
+        weight[index][i] = min(weight_max, max(weight_min, weight[index][i]));
+      }
+    }
+    ghistory = ((ghistory << 1) | outcome) & ghistoryMask;
   }
   default:
     break;
